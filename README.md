@@ -46,6 +46,34 @@ La contraseña debe tener mayúscula, minúscula, número y un carácter especia
 El usuario se crea solo si todavía no existe; para cambiar la contraseña después, borra
 `incidencias.db` y vuelve a iniciar la aplicación.
 
+## Búsqueda con Algolia
+
+La búsqueda (`/Operaciones/Incidencias?q=texto`) se ejecuta en el servidor: el controlador
+consulta Algolia, obtiene los `objectID` (= Id de la incidencia) y luego filtra en SQLite
+solo las incidencias con `Estado = Abierta`. La ApiKey nunca se envía al navegador.
+
+| Configuración | Variable de entorno | Descripción |
+|---|---|---|
+| `Algolia:ApplicationId` | `Algolia__ApplicationId` | Application ID de Algolia |
+| `Algolia:ApiKey` | `Algolia__ApiKey` | Clave del servidor (secreta) |
+| `Algolia:IndexName` | `Algolia__IndexName` | Nombre del índice (por defecto `incidencias`) |
+| `Algolia:IndexarAlIniciar` | `Algolia__IndexarAlIniciar` | `true` para subir las incidencias de SQLite al índice al iniciar |
+
+En desarrollo:
+
+```bash
+dotnet user-secrets set "Algolia:ApplicationId" "TU_APP_ID"
+dotnet user-secrets set "Algolia:ApiKey" "TU_API_KEY"
+dotnet user-secrets set "Algolia:IndexarAlIniciar" "true"   # solo para poblar el índice
+```
+
+Para indexar, la clave necesita permisos `addObject` y `editSettings` (p. ej. la Admin API Key).
+Si solo se busca sobre un índice ya poblado, basta una clave con permiso `search`.
+Los documentos del índice tienen `objectID`, `estacion`, `descripcion` y `prioridad`, con
+`searchableAttributes = [estacion, descripcion]`.
+
+Sin configuración de Algolia la aplicación funciona igual; solo la búsqueda muestra un aviso.
+
 ## Ejecutar
 
 ```bash
@@ -54,3 +82,22 @@ dotnet run --launch-profile http
 ```
 
 Abre http://localhost:5248/Operaciones/Incidencias e inicia sesión con el Supervisor.
+
+## Caché con Redis
+
+El listado general de `/Operaciones/Incidencias` (sin texto de búsqueda) se guarda en Redis
+con la clave `incidencias:abiertas` durante 60 segundos. Al cerrar una incidencia, primero se
+guarda en SQLite y después se elimina esa clave. Las búsquedas por texto no usan la caché.
+
+| Configuración | Variable de entorno |
+|---|---|
+| `ConnectionStrings:Redis` | `ConnectionStrings__Redis` |
+
+Acepta `host:6379,password=...` o una URL `redis://usuario:clave@host:6379` (`rediss://` para TLS).
+
+```bash
+dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379"
+```
+
+Sin esa configuración, o si Redis se cae, la aplicación funciona igual leyendo de SQLite.
+En los logs aparece `Cache HIT` o `Cache MISS` en cada consulta del listado.
