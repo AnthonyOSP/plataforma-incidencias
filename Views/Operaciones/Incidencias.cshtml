@@ -1,0 +1,65 @@
+@model IEnumerable<Incidencia>
+@{
+    ViewData["Title"] = "Incidencias abiertas";
+    var esSupervisor = User.IsInRole(PlataformaIncidencias.Data.Roles.Supervisor);
+}
+
+<h1>Incidencias abiertas</h1>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <div class="alert alert-success" role="alert">@mensaje</div>
+}
+
+@if (!Model.Any())
+{
+    <p class="text-muted">No hay incidencias abiertas.</p>
+}
+else
+{
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Estación</th>
+                <th>Descripción</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th>Fecha de creación</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var incidencia in Model)
+            {
+                var claseBadge = incidencia.Prioridad switch
+                {
+                    Prioridad.Critica => "bg-danger",
+                    Prioridad.Alta => "bg-warning text-dark",
+                    Prioridad.Media => "bg-info text-dark",
+                    _ => "bg-secondary"
+                };
+                <tr>
+                    <td>@incidencia.Id</td>
+                    <td>@incidencia.Estacion</td>
+                    <td>@incidencia.Descripcion</td>
+                    <td><span class="badge @claseBadge">@incidencia.Prioridad</span></td>
+                    <td>@incidencia.Estado</td>
+                    <td>@incidencia.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>
+                        @if (esSupervisor)
+                        {
+                            <form asp-action="Cerrar" asp-route-id="@incidencia.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Cerrar</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">Solo Supervisor</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
