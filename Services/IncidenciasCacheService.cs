@@ -26,7 +26,7 @@ public class IncidenciasCacheService : IIncidenciasCacheService
         _redis = redis;
     }
 
-    public async Task<List<Incidencia>> ObtenerAbiertasAsync(CancellationToken cancellationToken = default)
+    public async Task<ListadoAbiertas> ObtenerAbiertasAsync(CancellationToken cancellationToken = default)
     {
         var redis = ObtenerRedis();
         if (redis is not null)
@@ -37,7 +37,8 @@ public class IncidenciasCacheService : IIncidenciasCacheService
                 if (valor.HasValue)
                 {
                     _logger.LogInformation("Cache HIT: incidencias abiertas obtenidas desde Redis (clave {Clave}).", ClaveAbiertas);
-                    return JsonSerializer.Deserialize<List<Incidencia>>(valor.ToString()) ?? [];
+                    var cacheadas = JsonSerializer.Deserialize<List<Incidencia>>(valor.ToString()) ?? [];
+                    return new ListadoAbiertas(cacheadas, DesdeRedis: true, GuardadoEnRedis: false);
                 }
             }
             catch (Exception ex) when (ex is RedisException or JsonException)
@@ -53,11 +54,12 @@ public class IncidenciasCacheService : IIncidenciasCacheService
             .OrderBy(i => i.FechaCreacion)
             .ToListAsync(cancellationToken);
 
+        var guardado = false;
         if (redis is not null)
         {
             try
             {
-                await redis.StringSetAsync(ClaveAbiertas, JsonSerializer.Serialize(abiertas), Duracion);
+                guardado = await redis.StringSetAsync(ClaveAbiertas, JsonSerializer.Serialize(abiertas), Duracion);
                 _logger.LogInformation("Incidencias abiertas guardadas en Redis (clave {Clave}, TTL {Segundos} s).", ClaveAbiertas, Duracion.TotalSeconds);
             }
             catch (RedisException ex)
@@ -66,7 +68,7 @@ public class IncidenciasCacheService : IIncidenciasCacheService
             }
         }
 
-        return abiertas;
+        return new ListadoAbiertas(abiertas, DesdeRedis: false, GuardadoEnRedis: guardado);
     }
 
     public async Task InvalidarAbiertasAsync()

@@ -101,3 +101,50 @@ dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379"
 
 Sin esa configuración, o si Redis se cae, la aplicación funciona igual leyendo de SQLite.
 En los logs aparece `Cache HIT` o `Cache MISS` en cada consulta del listado.
+
+## Despliegue en Render
+
+El repositorio incluye un `Dockerfile` (Render no tiene entorno nativo de .NET).
+
+1. En Render: **New → Web Service**, conecta el repositorio de GitHub.
+2. **Runtime / Language:** `Docker` (detecta el `Dockerfile` de la raíz).
+3. **Instance type:** Free.
+4. En **Environment** agrega estas variables (los valores secretos no están en el repositorio):
+
+| Variable | Valor | ¿Secreta? |
+|---|---|---|
+| `SeedSupervisor__Password` | Contraseña del Supervisor para las pruebas | Sí |
+| `Algolia__ApplicationId` | Application ID de Algolia | No |
+| `Algolia__ApiKey` | API Key con permiso de escritura (para indexar) | Sí |
+| `Algolia__IndexarAlIniciar` | `true` | No |
+| `ConnectionStrings__Redis` | `redis://default:CLAVE@HOST:PUERTO` | Sí |
+| `PieHost__ClusterUrl` | `https://free.blr2.piesocket.com` | No |
+| `PieHost__ApiKey` | API Key de PieHost | No (pública) |
+| `PieHost__Secret` | Secret de PieHost | Sí |
+
+El `Dockerfile` ya define `ASPNETCORE_ENVIRONMENT=Production`, la ruta de SQLite
+(`/app/data/incidencias.db`) y el puerto (usa la variable `PORT` que asigna Render).
+
+Si en PieHost la API Key tiene dominios permitidos, añade el dominio `*.onrender.com` de tu servicio.
+
+**Importante:** en el plan gratuito el disco es temporal. SQLite se recrea en cada despliegue o
+cuando el servicio se reinicia tras 15 minutos sin uso: las incidencias vuelven a su estado inicial.
+Al iniciar, la aplicación reindexa Algolia y descarta la caché de Redis anterior. La primera carga
+tras estar inactivo puede tardar ~30–50 s.
+
+## Cómo probar la aplicación publicada
+
+Inicia sesión con `supervisor@bicis.local` y la contraseña configurada en `SeedSupervisor__Password`,
+y abre **Incidencias**. Bajo el título, la etiqueta **Datos** indica de dónde salió la lista.
+
+1. **Algolia (búsqueda):** busca `kennedy` → solo la #1 (la #6 coincide pero está cerrada).
+   Busca `frenos` → la #3. Etiqueta: *Algolia + SQLite*.
+2. **Redis (caché 60 s):** sin búsqueda, la primera carga muestra *SQLite (guardado en Redis por 60 s)*;
+   al recargar antes de 60 s muestra *Redis (caché)*. Al cerrar una incidencia, la siguiente carga
+   vuelve a *SQLite* porque la caché se invalidó.
+3. **PieHost (tiempo real):** abre la lista en dos navegadores (uno en incógnito, ambos con sesión).
+   El indicador debe decir *Tiempo real: conectado*. Cierra una incidencia en uno: desaparece sola
+   en el otro, sin recargar.
+
+En la pestaña **Logs** de Render se ve la secuencia de cada cierre:
+`Incidencia N cerrada y guardada en SQLite` → `Caché invalidada` → `Evento IncidenciaActualizada publicado en PieHost`.

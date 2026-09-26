@@ -40,6 +40,13 @@ var app = builder.Build();
 await SeedData.InicializarAsync(app.Services);
 await SeedData.IndexarEnAlgoliaAsync(app.Services);
 
+// La base SQLite puede haberse recreado (p. ej. en cada despliegue de Render):
+// se descarta el listado cacheado anterior para no mostrar datos de otra base.
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<IIncidenciasCacheService>().InvalidarAbiertasAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

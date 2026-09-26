@@ -43,8 +43,11 @@ public class OperacionesController : Controller
         // (con respaldo en SQLite si Redis no está disponible).
         if (string.IsNullOrEmpty(q))
         {
-            var abiertas = await _cache.ObtenerAbiertasAsync(cancellationToken);
-            return View(abiertas);
+            var listado = await _cache.ObtenerAbiertasAsync(cancellationToken);
+            ViewData["FuenteDatos"] = listado.DesdeRedis
+                ? "Redis (caché)"
+                : listado.GuardadoEnRedis ? "SQLite (guardado en Redis por 60 s)" : "SQLite (Redis no disponible)";
+            return View(listado.Incidencias);
         }
 
         // Búsqueda por texto: NO usa Redis. Algolia solo identifica qué incidencias
@@ -69,6 +72,7 @@ public class OperacionesController : Controller
             }
         }
 
+        ViewData["FuenteDatos"] = "Algolia + SQLite";
         var resultado = await _context.Incidencias
             .Where(i => i.Estado == EstadoIncidencia.Abierta && ids.Contains(i.Id))
             .OrderBy(i => i.FechaCreacion)
