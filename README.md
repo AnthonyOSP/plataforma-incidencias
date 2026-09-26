@@ -59,3 +59,22 @@ dotnet run --launch-profile http
 ```
 
 Abre http://localhost:5248/Operaciones/Incidencias e inicia sesión con el Supervisor.
+
+## Caché con Redis
+
+El listado general de `/Operaciones/Incidencias` (sin texto de búsqueda) se guarda en Redis
+con la clave `incidencias:abiertas` durante 60 segundos. Al cerrar una incidencia, primero se
+guarda en SQLite y después se elimina esa clave. Las búsquedas por texto no usan la caché.
+
+| Configuración | Variable de entorno |
+|---|---|
+| `ConnectionStrings:Redis` | `ConnectionStrings__Redis` |
+
+Acepta `host:6379,password=...` o una URL `redis://usuario:clave@host:6379` (`rediss://` para TLS).
+
+```bash
+dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379"
+```
+
+Sin esa configuración, o si Redis se cae, la aplicación funciona igual leyendo de SQLite.
+En los logs aparece `Cache HIT` o `Cache MISS` en cada consulta del listado.

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
 using PlataformaIncidencias.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,15 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
 
 builder.Services.Configure<AlgoliaOptions>(builder.Configuration.GetSection(AlgoliaOptions.Seccion));
 builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
+
+// Redis es opcional: sin ConnectionStrings:Redis el listado se lee siempre de SQLite.
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+        ConnectionMultiplexer.Connect(RedisConfiguracion.Crear(redisConnectionString)));
+}
+builder.Services.AddScoped<IIncidenciasCacheService, IncidenciasCacheService>();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
