@@ -13,17 +13,20 @@ public class OperacionesController : Controller
     private readonly ApplicationDbContext _context;
     private readonly IIncidenciasCacheService _cache;
     private readonly IAlgoliaService _algolia;
+    private readonly IPieHostPublisher _pieHost;
     private readonly ILogger<OperacionesController> _logger;
 
     public OperacionesController(
         ApplicationDbContext context,
         IIncidenciasCacheService cache,
         IAlgoliaService algolia,
+        IPieHostPublisher pieHost,
         ILogger<OperacionesController> logger)
     {
         _context = context;
         _cache = cache;
         _algolia = algolia;
+        _pieHost = pieHost;
         _logger = logger;
     }
 
@@ -32,6 +35,9 @@ public class OperacionesController : Controller
     {
         q = q?.Trim();
         ViewData["Busqueda"] = q;
+
+        // Solo la URL pública del canal (con la API Key pública); el Secret no sale del servidor.
+        ViewData["PieHostWebSocketUrl"] = _pieHost.ObtenerUrlWebSocket();
 
         // Listado GENERAL (sin texto de búsqueda): se sirve desde la caché de Redis
         // (con respaldo en SQLite si Redis no está disponible).
@@ -71,6 +77,19 @@ public class OperacionesController : Controller
         return View(resultado);
     }
 
+    // GET: /Operaciones/IncidenciasAbiertas
+    // Estado vigente para que el navegador se sincronice tras (re)conectar el WebSocket.
+    [HttpGet]
+    public async Task<IActionResult> IncidenciasAbiertas()
+    {
+        var abiertas = await _context.Incidencias
+            .Where(i => i.Estado == EstadoIncidencia.Abierta)
+            .Select(i => new { i.Id, Estado = i.Estado.ToString() })
+            .ToListAsync();
+
+        return Json(abiertas);
+    }
+
     // POST: /Operaciones/Cerrar/5
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -91,6 +110,9 @@ public class OperacionesController : Controller
 
             // Invalidar la caché solo después de confirmar la persistencia.
             await _cache.InvalidarAbiertasAsync();
+
+            // Publicar al final. Si PieHost falla, el cierre ya quedó guardado y la caché invalidada.
+            await _pieHost.PublicarIncidenciaActualizadaAsync(incidencia.Id, incidencia.Estado);
             TempData["Mensaje"] = $"La incidencia #{incidencia.Id} fue cerrada.";
         }
 

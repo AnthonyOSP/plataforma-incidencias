@@ -28,6 +28,10 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
 }
 builder.Services.AddScoped<IIncidenciasCacheService, IncidenciasCacheService>();
 
+builder.Services.Configure<PieHostOptions>(builder.Configuration.GetSection(PieHostOptions.Seccion));
+builder.Services.AddHttpClient<IPieHostPublisher, PieHostPublisher>(client =>
+    client.Timeout = TimeSpan.FromSeconds(5));
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
