@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
 using PlataformaIncidencias.Models;
+using PlataformaIncidencias.Services;
 
 namespace PlataformaIncidencias.Controllers;
 
@@ -10,10 +11,14 @@ namespace PlataformaIncidencias.Controllers;
 public class OperacionesController : Controller
 {
     private readonly ApplicationDbContext _context;
+    private readonly IPieHostPublisher _pieHost;
+    private readonly ILogger<OperacionesController> _logger;
 
-    public OperacionesController(ApplicationDbContext context)
+    public OperacionesController(ApplicationDbContext context, IPieHostPublisher pieHost, ILogger<OperacionesController> logger)
     {
         _context = context;
+        _pieHost = pieHost;
+        _logger = logger;
     }
 
     // GET: /Operaciones/Incidencias
@@ -24,7 +29,22 @@ public class OperacionesController : Controller
             .OrderBy(i => i.FechaCreacion)
             .ToListAsync();
 
+        // Solo la URL pública del canal (con la API Key pública); el Secret no sale del servidor.
+        ViewData["PieHostWebSocketUrl"] = _pieHost.ObtenerUrlWebSocket();
         return View(abiertas);
+    }
+
+    // GET: /Operaciones/IncidenciasAbiertas
+    // Estado vigente para que el navegador se sincronice tras (re)conectar el WebSocket.
+    [HttpGet]
+    public async Task<IActionResult> IncidenciasAbiertas()
+    {
+        var abiertas = await _context.Incidencias
+            .Where(i => i.Estado == EstadoIncidencia.Abierta)
+            .Select(i => new { i.Id, Estado = i.Estado.ToString() })
+            .ToListAsync();
+
+        return Json(abiertas);
     }
 
     // POST: /Operaciones/Cerrar/5
@@ -43,6 +63,10 @@ public class OperacionesController : Controller
         {
             incidencia.Estado = EstadoIncidencia.Cerrada;
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Incidencia {Id} cerrada y guardada en SQLite.", incidencia.Id);
+
+            // Publicar solo después de persistir. Si PieHost falla, el cierre ya quedó guardado.
+            await _pieHost.PublicarIncidenciaActualizadaAsync(incidencia.Id, incidencia.Estado);
             TempData["Mensaje"] = $"La incidencia #{incidencia.Id} fue cerrada.";
         }
 

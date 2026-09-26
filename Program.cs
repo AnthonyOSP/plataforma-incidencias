@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
+using PlataformaIncidencias.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
+builder.Services.Configure<PieHostOptions>(builder.Configuration.GetSection(PieHostOptions.Seccion));
+builder.Services.AddHttpClient<IPieHostPublisher, PieHostPublisher>(client =>
+    client.Timeout = TimeSpan.FromSeconds(5));
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
