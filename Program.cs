@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
+using PlataformaIncidencias.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// Redis es opcional: sin ConnectionStrings:Redis el listado se lee siempre de SQLite.
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+        ConnectionMultiplexer.Connect(RedisConfiguracion.Crear(redisConnectionString)));
+}
+builder.Services.AddScoped<IIncidenciasCacheService, IncidenciasCacheService>();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
