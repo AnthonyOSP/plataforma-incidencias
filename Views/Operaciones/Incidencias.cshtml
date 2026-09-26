@@ -2,9 +2,26 @@
 @{
     ViewData["Title"] = "Incidencias abiertas";
     var esSupervisor = User.IsInRole(PlataformaIncidencias.Data.Roles.Supervisor);
+    var busqueda = ViewData["Busqueda"] as string;
 }
 
-<h1>Incidencias abiertas con consulta rápida</h1>
+<h1>Incidencias abiertas encontradas</h1>
+
+<form asp-action="Incidencias" method="get" class="row g-2 align-items-end mb-3" role="search">
+    <div class="col-sm-8 col-md-6">
+        <label for="q" class="form-label">Buscar por estación o descripción</label>
+        <input type="search" id="q" name="q" value="@busqueda" class="form-control" placeholder="Ej.: Kennedy, frenos..." />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        <a asp-action="Incidencias" class="btn btn-outline-secondary">Limpiar</a>
+    </div>
+</form>
+
+@if (ViewData["ErrorBusqueda"] is string errorBusqueda)
+{
+    <div class="alert alert-warning" role="alert">@errorBusqueda</div>
+}
 
 @if (TempData["Mensaje"] is string mensaje)
 {
@@ -13,7 +30,9 @@
 
 @if (!Model.Any())
 {
-    <p class="text-muted">No hay incidencias abiertas.</p>
+    <p class="text-muted">
+        @(string.IsNullOrEmpty(busqueda) ? "No hay incidencias abiertas." : $"No se encontraron incidencias abiertas para \"{busqueda}\".")
+    </p>
 }
 else
 {
@@ -49,7 +68,7 @@ else
                     <td>
                         @if (esSupervisor)
                         {
-                            <form asp-action="Cerrar" asp-route-id="@incidencia.Id" method="post" class="d-inline">
+                            <form asp-action="Cerrar" asp-route-id="@incidencia.Id" asp-route-q="@busqueda" method="post" class="d-inline">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Cerrar</button>
                             </form>
                         }

@@ -16,6 +16,9 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
+builder.Services.Configure<AlgoliaOptions>(builder.Configuration.GetSection(AlgoliaOptions.Seccion));
+builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
+
 // Redis es opcional: sin ConnectionStrings:Redis el listado se lee siempre de SQLite.
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
@@ -31,6 +34,7 @@ builder.Services.AddRazorPages();
 var app = builder.Build();
 
 await SeedData.InicializarAsync(app.Services);
+await SeedData.IndexarEnAlgoliaAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
