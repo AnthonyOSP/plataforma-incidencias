@@ -483,7 +483,34 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# Base de datos SQLite local
+# ============================================================
+# Secretos y datos locales (Algolia, Redis, PieHost, Identity)
+# Los secretos van en user-secrets o variables de entorno.
+# ============================================================
+
+# Archivos de variables de entorno (se permite solo la plantilla)
+.env
+.env.*
+*.env
+!.env.example
+
+# Configuración local con secretos (no la carga la app por defecto,
+# pero evita subirla si alguien la crea)
+appsettings.*.local.json
+appsettings.Local.json
+appsettings.Production.json
+secrets.json
+
+# Base de datos SQLite local (contiene usuarios y hashes de Identity)
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Claves y certificados (Data Protection / HTTPS)
+*.pem
+*.key
+*.pfx
+DataProtection-Keys/

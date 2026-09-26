@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PlataformaIncidencias.Services;
 
 namespace PlataformaIncidencias.Data;
 
@@ -53,6 +55,35 @@ public static class SeedData
         if (!await userManager.IsInRoleAsync(supervisor, Roles.Supervisor))
         {
             await userManager.AddToRoleAsync(supervisor, Roles.Supervisor);
+        }
+    }
+
+    // Sube las incidencias de SQLite al índice de Algolia si Algolia:IndexarAlIniciar es true.
+    // Requiere una ApiKey con permiso de escritura (addObject y editSettings).
+    public static async Task IndexarEnAlgoliaAsync(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var provider = scope.ServiceProvider;
+        var options = provider.GetRequiredService<IOptions<AlgoliaOptions>>().Value;
+        var algolia = provider.GetRequiredService<IAlgoliaService>();
+        var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(SeedData));
+
+        if (!options.IndexarAlIniciar || !algolia.EstaConfigurado)
+        {
+            return;
+        }
+
+        try
+        {
+            var context = provider.GetRequiredService<ApplicationDbContext>();
+            var incidencias = await context.Incidencias.AsNoTracking().ToListAsync();
+            await algolia.IndexarAsync(incidencias);
+            logger.LogInformation("Se indexaron {Cantidad} incidencias en Algolia ({Indice}).", incidencias.Count, options.IndexName);
+        }
+        catch (Exception ex)
+        {
+            // La aplicación debe poder iniciar aunque Algolia no responda.
+            logger.LogError(ex, "No se pudieron indexar las incidencias en Algolia.");
         }
     }
 }
